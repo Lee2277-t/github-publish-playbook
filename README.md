@@ -19,7 +19,7 @@
 
 **已经会了，只想要命令** → [§9 命令速查](#9-命令速查)
 
-**搞砸了** → [§8 急诊室](#8-急诊室出事了怎么办) 或 [§10 排错手册](#10-排错手册我干了xx怎么救)
+**搞砸了** → [§8 急诊室](#8-急诊室出事了怎么办)，或看专门的 [`docs/troubleshooting.md`](docs/troubleshooting.md)
 
 **想知道这些内容从哪来** → [§13 来源与致谢](#13-来源与致谢)
 
@@ -37,7 +37,7 @@
 - [7. 十二个坑](#7-十二个坑)
 - [8. 急诊室：出事了怎么办](#8-急诊室出事了怎么办)
 - [9. 命令速查](#9-命令速查)
-- [10. 排错手册：我干了XX，怎么救](#10-排错手册我干了xx怎么救)
+- [10. 排错手册](#10-排错手册)（完整版单独成册）
 - [11. 许可证怎么选](#11-许可证怎么选)
 - [12. 常见问题](#12-常见问题)
 - [13. 来源与致谢](#13-来源与致谢)
@@ -943,181 +943,25 @@ gh api repos/{owner}/{repo}/commits --jq '.[].commit.author.email' | sort -u
 
 ---
 
-## 10. 排错手册：我干了XX，怎么救
+## 10. 排错手册
 
-### 10.1 提交到了错误的分支
+**「我干了 XX，怎么救」的完整版单独成册了 → [`docs/troubleshooting.md`](docs/troubleshooting.md)**
 
-```bash
-git branch correct-branch        # 在新分支上留个标记
-git reset --hard HEAD~1          # 当前分支回退
-git switch correct-branch
-```
+那份手册按「搜报错原文」组织，**42 个场景 + 24 条报错索引**。这里只留最常用的六条：
 
-### 10.2 忘记了 push / 忘记 commit
+| 症状 | 一句话解法 |
+|---|---|
+| `push` 被拒（non-fast-forward） | `git pull --rebase && git push` |
+| `src refspec main does not match any` | 分支叫 `master`：`git branch -M main` |
+| 提交到了错误分支 | 没推：`git branch 正确名 && git reset --hard HEAD~1` |
+| 误 `reset --hard` 丢了提交 | `git reflog` 找到位置 → `git reset --hard HEAD@{n}` |
+| 误删分支 | `git reflog` 找 sha → `git checkout -b 名字 <sha>` |
+| 想撤销已推送的提交 | `git revert <sha> && git push`（别强推） |
 
-```bash
-git status          # 看有什么没提交
-git log origin/main..HEAD --oneline    # 看有什么没推送
-```
-
-### 10.3 提交信息写错了
-
-```bash
-git commit --amend -m "正确的信息"        # 最近一条，且没推过
-# 更早的：
-git rebase -i HEAD~3                     # 把目标行改成 reword
-```
-
-### 10.4 推错了，远端要回滚
-
-```bash
-git revert <sha> && git push             # 安全，推荐
-# 或（会改历史，需强推）
-git reset --hard <good-sha> && git push --force-with-lease
-```
-
-### 10.5 误删了分支
-
-```bash
-git reflog                       # 找到删除前的 sha
-git checkout -b recovered <sha>
-```
-
-### 10.6 误 `reset --hard` 丢了提交
-
-```bash
-git reflog                       # 找 ORIG_HEAD 之前的位置
-git reset --hard HEAD@{1}
-```
-
-> `reset --hard` 丢的是**工作区改动**，已提交的内容在 reflog 里通常还能找回。
-> 但**从未提交过**的改动找不回来——这也是为什么勤提交。
-
-### 10.7 合并冲突搞乱了
-
-```bash
-git merge --abort                # 回到合并前
-git rebase --abort               # rebase 同理
-# 想重来：
-git reset --hard ORIG_HEAD
-```
-
-逐文件解决时：
-
-```bash
-git diff --name-only --diff-filter=U     # 列出冲突文件
-# 编辑后
-git add <file>
-git rebase --continue    # 或 git merge --continue
-```
-
-一方全要：
-
-```bash
-git checkout --ours <file>       # rebase 时 ours/theirs 是反的，注意
-git checkout --theirs <file>
-```
-
-### 10.8 `push` 被拒（non-fast-forward）
-
-```bash
-git pull --rebase origin main    # 先变基到最新
-git push
-```
-
-**别直接 `--force`**——会把别人的提交冲掉。
-
-### 10.9 大文件推不上去
-
-```
-remote: error: File xxx is 128.00 MB; this exceeds GitHub's file size limit of 100.00 MB
-```
-
-```bash
-git rm --cached bigfile.zip
-printf 'bigfile.zip\n' >> .gitignore
-git commit -m "移除大文件"
-# 历史里还在：
-git filter-repo --path bigfile.zip --invert-paths
-```
-
-或转 LFS：`git lfs migrate import --include="*.zip"`。
-
-### 10.10 换行符导致"整个文件都改了"
-
-```bash
-# 规范化
-git add --renormalize .
-git commit -m "统一换行为 LF"
-```
-
-同时确认 `.gitattributes` 存在（见 [§2.3](#23-gitattributes统一换行)）。
-
-### 10.11 中文文件名显示成 `\346\226\207...`
-
-```bash
-git config --global core.quotepath false
-```
-
-### 10.12 fork 后同步上游更新
-
-```bash
-git remote add upstream https://github.com/ORIGINAL/REPO.git
-git fetch upstream
-git switch main
-git merge upstream/main        # 或 git rebase upstream/main
-git push origin main
-```
-
-### 10.13 想让某文件不被追踪但保留本地
-
-```bash
-git rm --cached config.local.json
-printf 'config.local.json\n' >> .gitignore
-git commit -m "不再追踪本地配置"
-```
-
-### 10.14 想让已追踪文件的本地修改被忽略
-
-```bash
-git update-index --skip-worktree config.local.json      # 忽略修改
-git update-index --no-skip-worktree config.local.json   # 恢复
-```
-
-> `--assume-unchanged` 是性能优化用途，会被 `git pull` 覆盖；配置类用 `--skip-worktree`。
-
-### 10.15 同一台机器多个 GitHub 账号
-
-`~/.ssh/config`：
-
-```
-Host github-work
-  HostName github.com
-  User git
-  IdentityFile ~/.ssh/id_work
-
-Host github-personal
-  HostName github.com
-  User git
-  IdentityFile ~/.ssh/id_personal
-```
-
-用的时候改远端地址：
-
-```bash
-git remote set-url origin git@github-work:company/repo.git
-```
-
-### 10.16 撤销一个 Release
-
-```bash
-gh release delete v1.0.0 --yes          # 删 Release
-git push origin --delete v1.0.0         # 删远端标签
-git tag -d v1.0.0                        # 删本地标签
-```
+其余（冲突、rebase 搞乱、大文件、密钥泄露、认证失败、TLS 中断、多账号、
+fork 同步、仓库改名、克隆太慢……）都在分册里。
 
 ---
-
 ## 11. 许可证怎么选
 
 | 许可证 | 别人能做什么 | 典型场景 |

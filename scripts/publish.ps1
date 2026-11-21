@@ -74,8 +74,10 @@ function Invoke-PrivacyScan {
 
 function Ensure-File($path, $content) {
     if (-not (Test-Path $path)) {
-        $content | Set-Content -Path $path -Encoding UTF8
-        Write-Ok "生成 $(Split-Path $path -Leaf)"
+        # .gitattributes / .gitignore 不能带 BOM：BOM 会被当成第一行内容，注释变属性名、首条规则失效
+        $enc = New-Object System.Text.UTF8Encoding($false)
+        [System.IO.File]::WriteAllLines($path, $content, $enc)
+        Write-Ok "生成 $(Split-Path $path -Leaf)（无 BOM）"
     } else {
         Write-Ok "$(Split-Path $path -Leaf) 已存在"
     }
@@ -136,7 +138,7 @@ Ensure-File (Join-Path $root '.gitignore') @(
 & $git -C $root -c core.autocrlf=false add -A 2>$null
 $staged = @(& $git -C $root diff --cached --name-only 2>$null)
 Write-Step "将提交 $($staged.Count) 个文件"
-if ($staged.Count -eq 0) { Write-Bad '没有可提交的内容（可能都被 .gitignore 挡掉了）' }
+if ($staged.Count -eq 0) { Write-Warn '没有可提交的内容（已是最新，或都被 .gitignore 挡掉了）' }
 
 # ---------- 4. 隐私扫描 ----------
 Write-Step '隐私扫描（暂存区）'

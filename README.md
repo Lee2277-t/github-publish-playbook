@@ -34,7 +34,7 @@
 - [4. 打 Release](#4-打-release)
 - [5. 持续集成（CI）](#5-持续集成ci)
 - [6. 验收清单](#6-验收清单)
-- [7. 十一个坑](#7-十一个坑)
+- [7. 十二个坑](#7-十二个坑)
 - [8. 急诊室：出事了怎么办](#8-急诊室出事了怎么办)
 - [9. 命令速查](#9-命令速查)
 - [10. 排错手册：我干了XX，怎么救](#10-排错手册我干了xx怎么救)
@@ -616,7 +616,7 @@ gh release view v1.0.0 --json assets --jq '.assets[]|"\(.name) \(.size)"'
 
 ---
 
-## 7. 十一个坑
+## 7. 十二个坑
 
 ### 坑 1 · 中文描述变成 `??????`
 
@@ -727,6 +727,31 @@ gh api repos/<o>/<r>/git/commits/HEAD --jq .tree.sha   # 远端
 
 ---
 
+### 坑 12 · `.gitattributes` / `.gitignore` 带了 BOM，第一行失效
+
+**症状**：git 报 `统一换行 is not a valid attribute name: .gitattributes:1`，
+或者 `.gitignore` 的第一条规则明明写了却不起作用。
+
+**原因**：文件开头有 UTF-8 BOM（`EF BB BF`）。`.gitattributes` / `.gitignore` 是**逐行纯文本解析**的，
+BOM 会被当成第一行内容的一部分，于是注释变成"属性名"、第一条规则变成"带前缀的模式"。
+
+**怎么来的**：Windows PowerShell 5.1 的 `Set-Content -Encoding UTF8` **默认写 BOM**。
+写 `.md`、`.py` 没事（大多数工具能跳过 BOM），但这两个点文件不行。
+
+**修法**：写成无 BOM 的 UTF-8。
+
+```powershell
+$enc = New-Object System.Text.UTF8Encoding($false)     # $false = 不加 BOM
+[System.IO.File]::WriteAllLines('C:\path\.gitattributes', $lines, $enc)
+```
+
+或者用 PowerShell 6+（`pwsh`）的 `Set-Content -Encoding utf8NoBOM`。
+
+**注意跟[坑 7](#坑-7--powershell-读-ps1-报一堆语法错)的区别**：
+`.ps1` **要** BOM（否则 5.1 按 ANSI 解析），`.gitattributes` / `.gitignore` **不能**要 BOM。
+两类文件要求相反，别一刀切。
+
+---
 ## 8. 急诊室：出事了怎么办
 
 ### 8.1 误传了密钥 / token
@@ -1158,7 +1183,7 @@ gh api repos/<o>/<r>/releases --jq '.[].assets[].download_count'
 
 ### 原创：实测得来
 
-§2.4 隐私扫描的三条硬规矩、§5.3 本地绿 CI 红的三类原因、§7 十一个坑、
+§2.4 隐私扫描的三条硬规矩、§5.3 本地绿 CI 红的三类原因、§7 十二个坑、
 §8.4 网络不通时用 API 绕过 git 传输、附录 A 的脚本——**都是实际操作中踩出来的**，
 在别处找不到同样的记录。
 

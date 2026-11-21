@@ -112,7 +112,7 @@ Thumbs.db'
 git add -A
 STAGED=$(git diff --cached --name-only | wc -l | tr -d ' ')
 step "将提交 $STAGED 个文件"
-[[ "$STAGED" -eq 0 ]] && bad "没有可提交的内容（可能都被 .gitignore 挡掉了）"
+[[ "$STAGED" -eq 0 ]] && warn "没有可提交的内容（已是最新，或都被 .gitignore 挡掉了）"
 
 # ---------- 4. 隐私扫描 ----------
 step "隐私扫描（暂存区）"

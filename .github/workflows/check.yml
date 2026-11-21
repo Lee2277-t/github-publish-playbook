@@ -1,0 +1,41 @@
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  scripts:
+    name: 脚本语法
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: bash 语法（publish.sh）
+        run: bash -n scripts/publish.sh
+
+      - name: PowerShell 语法（publish.ps1）
+        shell: pwsh
+        run: |
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            "$PWD/scripts/publish.ps1", [ref]$null, [ref]$errors) | Out-Null
+          if ($errors) {
+            $errors | ForEach-Object { Write-Host "::error::行 $($_.Extent.StartLineNumber): $($_.Message)" }
+            exit 1
+          }
+          Write-Host "publish.ps1 语法 OK"
+
+      - name: 文档自检（章节与链接）
+        run: |
+          missing=0
+          for section in "准备工作" "隐私扫描" "命令速查" "排错手册" "许可证"; do
+            grep -q "$section" README.md || { echo "::error::README 缺少章节：$section"; missing=1; }
+          done
+          # 本地相对链接必须指向存在的文件
+          for link in $(grep -oP '\]\(\K[^)#]+(?=\))' README.md | grep -v '^https\?://' | sort -u); do
+            [ -e "$link" ] || { echo "::error::链接指向不存在的文件：$link"; missing=1; }
+          done
+          exit $missing
